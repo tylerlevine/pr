@@ -73,6 +73,9 @@ usage() {
 		* pr verify
 			Verify that the current HEAD has at least one valid review signature relative to master
 
+		* pr import
+			Import public keys from .reviewers into local keychain
+
 		* pr version
 			Report the version number
 		EOF
@@ -117,6 +120,13 @@ usage() {
 		pr verify
 
 		Verify that the current HEAD has at least one valid review signature relative to master
+		EOF
+		;;
+
+	"import" ) cat <<-EOF
+		pr import
+
+		Import public keys from .reviewers into local keychain
 		EOF
 		;;
 
@@ -384,8 +394,8 @@ cmd_accept() {
 }
 
 cmd_show() {
-	local opts raw=0 from to="HEAD" trustdb="./.reviewers" ignoreown=0
-	opts="$($GETOPT -o hrf:t:d:i -l help,raw,from:,to:,trustdb:,ignoreown -n "$PROGRAM" -- "$@")";
+	local opts raw=0 from to="HEAD" trustdb="./.reviewers"
+	opts="$($GETOPT -o hrf:t:d: -l help,raw,from:,to:,trustdb: -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage show; exit 0;;
@@ -393,7 +403,6 @@ cmd_show() {
 		-f|--from) from="$2"; shift 2;;
 		-t|--to) to="$2"; shift 2;;
 		-d|--trustdb) trustdb="$2"; shift 2;;
-		-i|--ignoreown) ignoreown=1; shift;;
 		--) shift; break;;
 	esac done
 	[ "$#" -gt 7 ] && usage show && exit 1
@@ -557,7 +566,7 @@ cmd_init() {
 }
 
 cmd_verify() {
-	local opts min_count=1 from to="HEAD" trustdb="./.reviewers"
+	local opts min_count=1 from="HEAD^" to="HEAD" trustdb="./.reviewers"
 	opts="$($GETOPT -o hf:t:m:d: -l help,from:,to:,min-count:,trustdb: -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
@@ -574,11 +583,24 @@ cmd_verify() {
 		| grep "ULTIMATE" \
 		| awk -F"|" '{ print $1 }' \
 		| uniq \
-		| grep -cvE "$(git log --pretty='format:%GK' | uniq | paste -s -d'|' -)" || true
+		| grep -cvE "$(git log --pretty='format:%GK' "$from".."$to" | uniq | paste -s -d'|' -)" || true
 	)
 
 	[[ "$valid_count" -ge "$min_count" ]] || \
 		{ error "verify_failed" "$min_count"; exit 1; }
+}
+
+cmd_import() {
+	local trustdb='./.reviewers'
+	opts="$($GETOPT -o ht: -l help,trustdb: -n "$PROGRAM" -- "$@")";
+	eval set -- "$opts"
+	while true; do case $1 in
+		-h|--help) usage import; exit 0;;
+		-d|--trustdb) trustdb="$2"; shift 2 ;;
+		--) shift; break ;;
+	esac done
+	[ "$#" -gt 2 ] && { usage import; exit 1; }
+	gpg --keyserver 'pgp.mit.edu' --recv-keys "$(gpg --trustdb-name="$trustdb" --export-ownertrust | grep -v '^#.*$'  | cut -d: -f1)"
 }
 
 cmd_addreviewer() {
