@@ -373,17 +373,17 @@ mark_pr_accepted() {
 
 cmd_accept() {
 	local opts key_id push=1 accept=1 upstream
-	opts="$($GETOPT -o hpknc: -l help,push,key,nopush,nocomment: -n "$PROGRAM" -- "$@")";
+	opts="$($GETOPT -o hpkns -l help,push,key,nopush,sigonly -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
-		-h|--help) usage add; exit 0;;
-		-k|--key) key_id="$2"; shift 2;;
-		-n|--no-push) push=0; shift;;
-		-u|--upstream) upstream=$2; shift 2;;
-		-c|--nocomment) accept=0; shift;;
+		-h|--help) usage add; exit 0 ;;
+		-k|--key) key_id="$2"; shift 2 ;;
+		-n|--no-push) push=0; shift ;;
+		-u|--upstream) upstream=$2; shift 2 ;;
+		-s|--sigonly) accept=0; shift ;;
 		--) shift; break ;;
 	esac done
-	[ "$#" -gt 2 ] || [ "$#" -lt 1 ] && usage accept && exit 1
+	[ "$#" != 1 ] && usage accept && exit 1
 
 	pr=${1}
 	key=${key_id:-$(git config user.signingKey)}
@@ -396,14 +396,12 @@ cmd_accept() {
 	echo "OK"
 
 	upstream="${upstream:-"$(hub pr list -h "$(git rev-parse --abbrev-ref HEAD)" -f '%B')"}"
-	#echo "Pull request base branch is $upstream"
 	base=$(default_base "$(git merge-base "$upstream" HEAD)")
-	#echo "Merge base commit is $base"
 
 	# check for HEAD equal to base
 	[ "$(git rev-parse "$base")" == "$(git rev-parse HEAD)" ] && echo "error: cannot sign empty diff" && exit 1
 
-	[[ "$accept" -eq "0" ]] || mark_pr_accepted
+	[[ "$accept" == "0" ]] || mark_pr_accepted
 
 	echo -n "Creating review signature..."
 
@@ -416,7 +414,7 @@ cmd_accept() {
 
 	echo "OK"
 
-	[[ "$push" -eq "0" ]] || push_sigs
+	[[ "$push" == "0" ]] || push_sigs
 }
 
 cmd_show() {
