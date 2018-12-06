@@ -146,41 +146,66 @@ error() {
 	reason="${1:-}"
 	code=1
 	case $reason in
-		"invalid_private_key" ) read -r -d '' template  <<-EOF
+		"invalid_private_key" ) read -r -d '!!' template  <<-EOF
 			Unable to create signature.
 			This is not a valid private key according to GnuPG: "%s"
 			Please set a public public key in your git configuration that has a
 			valid local private key you control.
 			> gpg --list-secret-keys
 			> git config user.signingKey "YOURKEYID"
+		!!
 		EOF
+		code=10
 		;;
 
-		"verify_failed" ) read -r -d '' template  <<-EOF
+		"verify_failed" ) read -r -d '!!' template  <<-EOF
 			Failed to find enough verifed signatures to satisfy: min_count=%s
 			Signature verification could fail simply because your local gnupg
 			keychain and trustdb does not contain the required keys.
 			For detailed signature status run:
 			> git signatures show
+		!!
 		EOF
+		code=20
 		;;
 
-		"gpg_status_fd" ) read -r -d '' template  <<-EOF
+		"gpg_status_fd" ) read -r -d '!!' template  <<-EOF
 			Unable to parse gpg's status-fd output.
 			%s
+		!!
 		EOF
-		code=99
+		code=30
 		;;
 
-		"sync" ) read -r -d '' template <<-EOF
+		"sync" ) read -r -d '!!' template <<-EOF
 			Sync failed.
 			%s
+		!!
 		EOF
+		code=40
 		;;
 
-		* ) read -r -d '' template <<-EOF
+		"aborted" )
+		read -r -d '!!' template <<-EOF
+			Aborted: %s
+		!!
+		EOF
+		code=50
+		;;
+
+		"branch" )
+		read -r -d '!!' template <<-EOF
+			Error: cannot create pull request for local branch %s
+			%s
+		!!
+		EOF
+		code=50
+		;;
+
+		* ) read -r -d '!!' template <<-EOF
 			Unknown error. Good luck!
 			%s
+		!!
 		EOF
 		code=100
 		;;
