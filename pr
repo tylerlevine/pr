@@ -475,12 +475,11 @@ update_pr() {
 
 	read -r -p "Would you like to update pull request #$PR_NUMBER? [y/N] " should_update
 
-	if [ "$should_update" == "y" ] || [ "$should_update" == "Y" ]; then
+	if [[ "$should_update" =~ ^[yY]$ ]]; then
 		echo "Updating pull request #$PR_NUMBER... "
 		git push origin "$(git rev-parse --abbrev-ref HEAD)"
 	else
-		echo "Aborting..."
-		exit 0
+		error "Aborted: Pull request not updated"
 	fi
 }
 
@@ -531,7 +530,14 @@ cmd_sync() {
 		exit 0
 	fi
 
-	create_pr "$BRANCH_NAME"
+	echo "No open pull request found for local branch $BRANCH_NAME"
+	read -r -p "Create a new pull request? [Y/n] " should_create
+
+	if [[ "$should_create" =~ ^[Yy]$ || "$should_create" == '' ]]; then
+		create_pr "$BRANCH_NAME"
+	else
+		error "aborted" "pull request not created"
+	fi
 }
 
 merge_pr() {
