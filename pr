@@ -627,34 +627,17 @@ cmd_verify() {
 }
 
 cmd_import() {
-	local trustdb='./.reviewers'
-	opts="$($GETOPT -o ht: -l help,trustdb: -n "$PROGRAM" -- "$@")";
+	local trustdb='./.reviewers' keyserver='hkp://keyserver.ubuntu.com:80'
+	opts="$($GETOPT -o ht:k: -l help,trustdb:,keyserver: -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage import; exit 0;;
 		-d|--trustdb) trustdb="$2"; shift 2 ;;
+		-k|--keyserver) keyserver="$2"; shift 2 ;;
 		--) shift; break ;;
 	esac done
 	[ "$#" -gt 2 ] && { usage import; exit 1; }
-	gpg --keyserver 'pgp.mit.edu' --recv-keys "$(gpg --trustdb-name="$trustdb" --export-ownertrust | grep -v '^#.*$'  | cut -d: -f1)"
-}
-
-cmd_addreviewer() {
-	echo "adding reviewer $1"
-	echo "error: not implemented"
-	exit 1
-}
-
-cmd_deletereviewer() {
-	echo "deleting reviewer $1"
-	echo "error: not implemented"
-	exit 1
-}
-
-cmd_listreviewers() {
-	echo "listing reviewers"
-	echo "error: not implemented"
-	exit 1
+	gpg --keyserver "$keyserver" --recv-keys "$(gpg --trustdb-name="$trustdb" --export-ownertrust | grep -v '^#.*$'  | cut -d: -f1)"
 }
 
 cmd_version() {
