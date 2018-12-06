@@ -1,7 +1,69 @@
-# pr
-`pr` is a command line tool for creating, updating, accepting, and landing pull github pull requests.
+# `pr`
+`pr` is a compatible command line tool for creating, updating, accepting, and landing pull github pull requests in a verifiably secure way.
+
+`pr` is a bash script which currently supports both bash and zsh.
 
 # Installation
+
+## Install Dependencies
+Before installing, ensure that the following binaries are available:
+* git
+* openssl
+* xargs
+* gpg
+
+These packages can be installed from most package managers if needed (eg, brew, apt, etc).
+
+### Mac OS X
+On Mac OS X, a few additional packages are required:
+* gnu-getopt
+* gdate
+
+To install these, run `brew install gnu-getopt coreutils`.
+
+# Install `pr`
+
+Run the following command to install `pr` into `/usr/local/bin`:
+
+`wget -q -O /usr/local/bin/pr https://raw.githubusercontent.com/tylerlevine/pr/master/pr`
+
+Make it executable:
+
+`chmod u+x /usr/local/bin/pr`
+
+Now running the `pr` command should print the usage information:
+
+```
+$ pr
+pr <command> [<args>]
+
+Commands
+--------
+
+* pr init
+Setup your repository for usage with pr
+
+* pr sync
+Create or update a github pull request from a branch
+
+* pr merge
+Merge a github pull request which has been accepted
+
+* pr accept
+Accept a github pull request and apply review signature
+
+* pr show
+Show review signatures for the current HEAD
+
+* pr verify
+Verify that the current HEAD has at least one valid review signature relative to master
+
+* pr import
+Import public keys from .reviewers into local keychain
+
+* pr version
+Report the version number
+```
 
 # Basic Usage
 
