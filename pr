@@ -569,8 +569,7 @@ cmd_merge() {
 	PR_NUMBER="$(hub pr list -h "$BRANCH_NAME" -s open -f '%I' -L 1)"
 
 	if [[ "$PR_NUMBER" == "" ]]; then
-		echo "Failed to find open pull request for branch $BRANCH_NAME. Aborting..."
-		exit 1
+		error "Failed to find open pull request for branch $BRANCH_NAME"
 	fi
 
 	# TODO: check ci status once github bot is functional
@@ -583,7 +582,7 @@ cmd_merge() {
 
 cmd_init() {
 	[ "$#" -eq 0 ] || { usage init; exit 1; }
-	echo "Setting git configuration..."
+	echo -n "Setting git configuration..."
 	git config --add \
 		remote.origin.fetch \
 		"+refs/notes/signatures:refs/notes/signatures"
@@ -599,6 +598,7 @@ cmd_init() {
 	git config --add \
 		remote.origin.push \
 		"+refs/tags/new-signature:refs/tags/new-signature"
+	echo "OK"
 }
 
 cmd_verify() {
