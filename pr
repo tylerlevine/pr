@@ -11,10 +11,10 @@ COMMAND="$1"
 GETOPT=$(command -v gnu-getopt || command -v getopt)
 DATE=$(command -v gdate || command -v date)
 PR_TEMPLATE="$(cat <<-EOF
-BG-%s: %s
+{title}
 
 # Summary
-%s
+{summary}
 
 ## Reviewers:
 
@@ -466,12 +466,11 @@ create_pr() {
 	echo "Creating new PR for branch $BRANCH_NAME..."
 
 	PR_MESSAGE_FILE=$(mktemp)
-	JIRA_NUMBER=$(cut -d'-' -f2 <<< "$BRANCH_NAME")
 	HEAD_COMMIT_SUBJECT="$(git log --pretty='format:%s' -1)"
 	HEAD_COMMIT_BODY="$(git log --pretty='format:%b' -1)"
 
-	# shellcheck disable=SC2059
-	printf "$PR_TEMPLATE" "${JIRA_NUMBER:-'XXXX'}" "$HEAD_COMMIT_SUBJECT" "$HEAD_COMMIT_BODY" > "$PR_MESSAGE_FILE"
+	# replace PR template placeholders with actual data
+	sed -e "s/{title}/${HEAD_COMMIT_SUBJECT:-''}/" -e "s/{summary}/${HEAD_COMMIT_BODY:-''}/" <<< "$PR_TEMPLATE" > "$PR_MESSAGE_FILE"
 	${EDITOR:-vi} "$PR_MESSAGE_FILE"
 
 	# extract reviewers, labels, and assignees
