@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+set -u
 set -o pipefail
 
 VERSION="v0.1.0"
