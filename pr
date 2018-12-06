@@ -528,7 +528,8 @@ cmd_sync() {
 	[ "$#" -eq 0 ] || { usage sync; exit 1; }
 
 	BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
-	PR_NUMBER="$(hub pr list -h "$BRANCH_NAME" -s open -f '%I' -L 1)"
+	[ "$BRANCH_NAME" == "master" ] && error "branch" "$BRANCH_NAME" "Cannot create pull request with commits made directly on local master"
+	PR_NUMBER="$(hub pr list -h "$BRANCH_NAME" -s open -f '%I' -L 1 2> /dev/null || echo -n 0)"
 
 	# check for existing open pr for this branch
 	if [ "${PR_NUMBER:-0}" -ge 1 ]; then
