@@ -21,7 +21,7 @@ On Mac OS X, a few additional packages are required:
 
 To install these, run `brew install gnu-getopt coreutils`.
 
-# Install `pr`
+## Install `pr`
 
 Run the following command to install `pr` into `/usr/local/bin`:
 
@@ -66,6 +66,47 @@ Report the version number
 ```
 
 # Basic Usage
+The first step in making a new change is to create a new feature branch where you will be working.
+
+```
+git checkout -b my-feature
+```
+
+Then you can make a few commits to the `my-feature` branch to implement your change.
+
+## Creating a pull request
+Once you are ready to create a pull request from this branch for review, run the sync command.
+
+```
+pr sync
+```
+
+This will prompt you for the pull request message, then push your branch to the remote repository, and create a pull request against `master`.
+
+You can then send the pull request URL to another engineer for review.
+
+## Accepting a pull request
+
+When someone has sent you a pull request URL for review, the first step is looking at the changes in github. Once you are ready to accept the pull request,
+run the accept command and pass the pull request number.
+
+```
+pr accept 12
+```
+
+This will create a review signature, push the review signature to the remote repository, and mark the pull request as accepted with a comment.
+
+## Merging a pull request
+
+Once you have your pull request accepted by another engineer, you can run the merge command to incorporate your change into the upstream branch.
+
+```
+pr merge
+```
+
+This will squash all the commits on the `my-feature` branch, and then rebase the squashed commit on the latest version of `master`. You will have a change to edit the resulting commit message in your editor before the commit is made.
+
+Additionally, the review signatures which were applied to the `my-feature` branch will be copied onto the new commit in `master`. The new version of `master` is then pushed to the remote repository, and the `my-feature` branch is deleted from both the remote and local repositories.
 
 # Command Reference
 
