@@ -6,7 +6,7 @@ set -o pipefail
 
 VERSION="v0.1.0"
 PROGRAM="${0##*/}"
-COMMAND="$1"
+COMMAND="${1:-usage}"
 
 GETOPT=$(command -v gnu-getopt || command -v getopt)
 DATE=$(command -v gdate || command -v date)
