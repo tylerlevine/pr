@@ -504,14 +504,20 @@ create_pr() {
 		LABELS="$(grep "Labels:" "$PR_MESSAGE_FILE" | cut -d':' -f2 | tr -d ' ')"
 	fi
 
-	if grep "Assignees:" "$PR_MESSAGE_FILE" > /dev/null; then
-		ASSIGNEES="$(grep "Assignees:" "$PR_MESSAGE_FILE" | cut -d':' -f2 | tr -d ' ')"
-	fi
+	# if grep "Assignees:" "$PR_MESSAGE_FILE" > /dev/null; then
+	# 	ASSIGNEES="$(grep "Assignees:" "$PR_MESSAGE_FILE" | cut -d':' -f2 | tr -d ' ')"
+	# fi
 
 	PR_CREATE_ARGS="-F $PR_MESSAGE_FILE -p"
 	[ ! -z "$REVIEWERS" ] && PR_CREATE_ARGS="$PR_CREATE_ARGS -r $REVIEWERS"
 	[ ! -z "$LABELS" ] && PR_CREATE_ARGS="$PR_CREATE_ARGS -l $LABELS"
-	[ ! -z "$ASSIGNEES" ] && PR_CREATE_ARGS="$PR_CREATE_ARGS -a $ASSIGNEES"
+	# [ ! -z "$ASSIGNEES" ] && PR_CREATE_ARGS="$PR_CREATE_ARGS -a $ASSIGNEES"
+
+	# make sure all local commits are pushed up to origin
+	if [ "$(git rev-parse origin/$BRANCH_NAME 2>&1 >/dev/null)" != "$(git rev-parse $BRANCH_NAME)" ]; then
+		echo "Updating out of date remote branch origin/$BRANCH_NAME..."
+		git push origin "$BRANCH_NAME" > /dev/null 2>&1
+	fi
 
 	# shellcheck disable=SC2086
 	PR_URL="$(hub pull-request $PR_CREATE_ARGS 2>&1 | grep 'https://' )"
