@@ -247,7 +247,7 @@ default_base() {
 }
 
 parse_sigstatus(){
-	local sig_key sig_time sig_date sig_author sig_status
+	local sig_key sig_time=0 sig_date sig_author sig_status
 	while read -r values; do
 		local status_code array pos
 		IFS=" " read -r -a array <<< "$values"
@@ -298,7 +298,7 @@ parse_sigstatus(){
 
 	sig_key="${sig_key:-UNKNOWN}"
 	sig_trust="${sig_trust:-UNKNOWN}"
-	if [[ -n "$sig_time" ]]; then
+	if [[ "$sig_time" != 0 ]]; then
 		sig_date="$($DATE -d @"$sig_time")"
 	else
 		sig_date=UNKNOWN
@@ -403,6 +403,7 @@ cmd_accept() {
 		error "invalid_private_key" "$key"; exit 1;
 	}
 
+	# TODO: validate pull request number before using
 	echo -n "Checking out pull request $pr..."
 	hub pr checkout "$pr" >/dev/null 2>&1
 	echo "OK"
