@@ -61,18 +61,18 @@ bgmerge() {
 	fi
 
 	echo -n "Checking out upstream branch $UPSTREAM..."
-	git checkout "$UPSTREAM"
+	git checkout "$UPSTREAM" > /dev/null 2>&1
 	echo "OK"
 	echo -n "Pulling upstream branch $UPSTREAM from origin..."
-	git pull origin "$UPSTREAM" # tap 1
+	git pull origin "$UPSTREAM" > /dev/null 2>&1 # tap 1
 	echo "OK"
 	echo -n "Merging $BRANCH_NAME into $UPSTREAM..."
-	git merge --no-ff "$BRANCH_NAME" # tap 2
+	git merge --no-ff "$BRANCH_NAME" > /dev/null 2>&1 # tap 2
 	echo "OK"
-	echo -n "Pushing new $UPSTREAM branch and deleing stale remote branch origin/$BRANCH_NAME..."
-	git push origin "$UPSTREAM" ":$BRANCH_NAME" # tap 3
+	echo -n "Pushing new $UPSTREAM branch and deleting stale remote branch origin/$BRANCH_NAME..."
+	git push origin "$UPSTREAM" ":$BRANCH_NAME" > /dev/null 2>&1 # tap 3
 	echo "OK"
-	echo -n "Removing unnecessary local branch $BRANCH_NAME (run `git checkout -b $BRANCH_NAME "$(git rev-parse --short $BRANCH_NAME)" recreate it`)..."
-	git branch -D "$BRANCH_NAME"
+	echo -n "Removing unnecessary local branch $BRANCH_NAME (run "git checkout -b $BRANCH_NAME "$(git rev-parse --short "$BRANCH_NAME")" recreate it")..."
+	git branch -D "$BRANCH_NAME" > /dev/null 2>&1
 	echo "Done!"
 }
