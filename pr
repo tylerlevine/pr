@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 bgaccept() {
-	local opts push=1 GETOPT UPSTREAM
+	local opts push=1 GETOPT
 	GETOPT=$(command -v gnu-getopt || command -v getopt)
 	opts="$($GETOPT -o hn -l help,nopush -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
@@ -13,10 +13,11 @@ bgaccept() {
 
 	BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
 
-	read -r -p "Are you sure you want to accept changes made on the $BRANCH_NAME branch? [yN]" should_accept
+	echo -n "Are you sure you want to accept changes made on the $BRANCH_NAME branch? [yN] "
+	read -r should_accept
 	if [[ ! "$should_accept" =~ ^[yY]$ ]]; then
 		echo "Aborted: changes not accepted"
-		exit 1
+		return 1
 	fi
 
 	echo -n "Accepting changes and creating signed review tag..."
@@ -35,9 +36,9 @@ bgaccept() {
 bgmerge() {
 	UPSTREAM=master # this is the branch commits will be merged into
 	BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
-	MIN_REVIEWS=1
+	MIN_REVIEWS=0
 
-	# make sure tip of merged branch has at least one signed tag
+	# make sure tip of merged branch has at least the minimum number of signed review tags
 	local valid_signed_tags=0
 	FORMAT_SCRIPT="%(if:notequals=<$(git config user.email)>)%(taggeremail)%(then)v%(end)"
 	valid_signed_tags=$(git for-each-ref \
@@ -49,7 +50,7 @@ bgmerge() {
 	if [[ "$valid_signed_tags" -lt "$MIN_REVIEWS" ]]; then
 		echo "Error: Failed to find enough signed review tags to satisfy minimum review requirement."
 		echo "Error: $valid_signed_tags reviews were found, but $MIN_REVIEWS are required"
-		exit 1
+		return 1
 	fi
 
 	echo "Merging branch $BRANCH_NAME into origin/$UPSTREAM..."
