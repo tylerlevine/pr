@@ -1,132 +1,8 @@
 #!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
-
-VERSION="v0.1.0"
-PROGRAM="${0##*/}"
-COMMAND="${1:-usage}"
-UPSTREAM=master # this is the branch commits will be merged into
-
-GETOPT=$(command -v gnu-getopt || command -v getopt)
-
-main(){
-	path_check git || exit 1
-
-	case $COMMAND in
-		""|"-h"|"--help"|"help"|"usage") usage; exit 0;;
-		"-v"|"--version") cmd_version; exit 0;;
-	esac
-
-	! type "cmd_$COMMAND" > /dev/null && usage
-
-	shift;
-	"cmd_$COMMAND" "$@"
-}
-
-path_check() {
-	for item in "$@"; do
-		if ! command -v "$item" >/dev/null; then
-			printf "%s not found in \$PATH \\n" "$item";
-			return 1;
-		fi
-	done
-	return 0
-}
-
-usage() {
-	topic="${1:-}"
-	case $topic in
-
-		"" ) cat <<-EOF
-		pr <command> [<args>]
-
-		Commands
-		--------
-
-		* pr accept
-			Accept changes on a branch and create a signed review tag.
-
-		* pr merge
-			Merge changes on a branch which has been accepted.
-
-		* pr version
-
-		EOF
-		;;
-
-	"accept" ) cat <<-EOF
-		pr accept <branch>
-
-		Accept changes on a branch and create a signed review tag.
-
-		Options:
-		-
-		EOF
-		;;
-
-	"merge" ) cat <<-EOF
-		pr merge <branch>
-
-		Merge changes on a branch which has been accepted.
-		EOF
-		;;
-
-	"version" ) cat <<-EOF
-		pr version
-
-		Print current version.
-		EOF
-		;;
-
-	esac
-}
-
-error() {
-	reason="${1:-}"
-	code=1
-	case $reason in
-	"verify_failed" ) read -r -d '!!' template  <<-EOF
-			Failed to find enough verifed signatures to satisfy: min_count=%s
-			Signature verification could fail simply because your local gnupg
-			keychain and trustdb does not contain the required keys.
-		!!
-		EOF
-		code=10
-		;;
-
-		"aborted" )
-		read -r -d '!!' template <<-EOF
-			Aborted: %s
-		!!
-		EOF
-		code=20
-		;;
-
-		* ) read -r -d '!!' template <<-EOF
-			Unknown error. Good luck!
-			%s
-		!!
-		EOF
-		code=100
-		;;
-	esac
-
-	# shellcheck disable=SC2059
-	printf "${template}\\n" "${@:2}" >&2
-	exit $code
-}
-
-push_tag() {
-	[ "$#" -eq 1 ] || { usage push; exit 1; }
-
-	TAG_NAME="$1"
-
-}
-
-cmd_accept() {
-	local opts push=1
+bgaccept() {
+	local opts push=1 GETOPT UPSTREAM
+	GETOPT=$(command -v gnu-getopt || command -v getopt)
 	opts="$($GETOPT -o hn -l help,nopush -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
@@ -139,7 +15,8 @@ cmd_accept() {
 
 	read -r -p "Are you sure you want to accept changes made on the $BRANCH_NAME branch? [yN]" should_accept
 	if [[ ! "$should_accept" =~ ^[yY]$ ]]; then
-		error "aborted" "Changes not accepted"
+		echo "Aborted: changes not accepted"
+		exit 1
 	fi
 
 	echo -n "Accepting changes and creating signed review tag..."
@@ -155,20 +32,24 @@ cmd_accept() {
 	fi
 }
 
-cmd_merge() {
+bgmerge() {
+	UPSTREAM=master # this is the branch commits will be merged into
 	BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
 	MIN_REVIEWS=1
 
 	# make sure tip of merged branch has at least one signed tag
 	local valid_signed_tags=0
-	for tag in $(git tag --points-at "$BRANCH_NAME"); do
-		if git tag -v "$tag" > /dev/null 2>&1; then
-			valid_signed_tags=$((valid_signed_tags + 1))
-		fi
-	done
+	FORMAT_SCRIPT="%(if:notequals=<$(git config user.email)>)%(taggeremail)%(then)v%(end)"
+	valid_signed_tags=$(git for-each-ref \
+		--points-at "$BRANCH_NAME" \
+		--format "$FORMAT_SCRIPT" \
+		refs/tags | grep -c v \
+	)
 
 	if [[ "$valid_signed_tags" -lt "$MIN_REVIEWS" ]]; then
-		error "verify_failed" "$MIN_REVIEWS"
+		echo "Error: Failed to find enough signed review tags to satisfy minimum review requirement."
+		echo "Error: $valid_signed_tags reviews were found, but $MIN_REVIEWS are required"
+		exit 1
 	fi
 
 	echo "Merging branch $BRANCH_NAME into origin/$UPSTREAM..."
@@ -178,9 +59,3 @@ cmd_merge() {
 	git push origin "$UPSTREAM" ":$BRANCH_NAME" # tap 3
 	git branch -D "$BRANCH_NAME"
 }
-
-cmd_version() {
-	echo "$PROGRAM $VERSION"
-}
-
-main "$@"
