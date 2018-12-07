@@ -92,12 +92,16 @@ usage() {
 	"sync" ) cat <<-EOF
 		pr sync
 
+		Setup your repository for usage with pr
+
 		TODO: detailed command usage
 		EOF
 		;;
 
 	"accept" ) cat <<-EOF
 		pr accept
+
+		Accept a github pull request and apply review signature
 
 		TODO: detailed command usage
 		EOF
@@ -106,12 +110,16 @@ usage() {
 	"merge" ) cat <<-EOF
 		pr merge [options]
 
+		Merge a github pull request which has been accepted
+
 		TODO: detailed command usage
 		EOF
 		;;
 
 	"show" ) cat <<-EOF
 		pr show [options]
+
+		Show review signatures for the current HEAD
 
 		TODO: detailed command usage
 		EOF
@@ -121,13 +129,17 @@ usage() {
 		pr verify
 
 		Verify that the current HEAD has at least one valid review signature relative to master
+
+		TODO: detailed command usage
 		EOF
 		;;
 
 	"import" ) cat <<-EOF
 		pr import
 
-		Import public keys from .reviewers into local keychain
+		Import public keys from .reviewers into local gpg keychain
+
+		TODO: detailed command usage
 		EOF
 		;;
 
@@ -135,7 +147,7 @@ usage() {
 	"version" ) cat <<-EOF
 		pr version
 
-		Get current version. Do you really need help with this?
+		Print current version.
 		EOF
 		;;
 
@@ -163,7 +175,7 @@ error() {
 			Signature verification could fail simply because your local gnupg
 			keychain and trustdb does not contain the required keys.
 			For detailed signature status run:
-			> git signatures show
+			> pr show
 		!!
 		EOF
 		code=20
