@@ -7,9 +7,9 @@ set -o pipefail
 VERSION="v0.1.0"
 PROGRAM="${0##*/}"
 COMMAND="${1:-usage}"
+UPSTREAM=master
 
 GETOPT=$(command -v gnu-getopt || command -v getopt)
-DATE=$(command -v gdate || command -v date)
 PR_TEMPLATE="$(cat <<-EOF
 {title}
 
@@ -56,9 +56,6 @@ usage() {
 		Commands
 		--------
 
-		* pr init
-			Setup your repository for usage with pr
-
 		* pr sync
 			Create or update a github pull request from a branch
 
@@ -72,20 +69,10 @@ usage() {
 			Show review signatures for the current HEAD
 
 		* pr verify
-			Verify that the current HEAD has at least one valid review signature relative to master
-
-		* pr import
-			Import public keys from .reviewers into local keychain
+			Verify that the current HEAD has at least the minimum number of valid review tags
 
 		* pr version
 			Report the version number
-		EOF
-		;;
-
-	"init" ) cat <<-EOF
-		pr init
-
-		TODO: detailed command usage
 		EOF
 		;;
 
@@ -119,7 +106,7 @@ usage() {
 	"show" ) cat <<-EOF
 		pr show [options]
 
-		Show review signatures for the current HEAD
+		Show review signature tags for the current HEAD
 
 		TODO: detailed command usage
 		EOF
@@ -128,21 +115,11 @@ usage() {
 	"verify" ) cat <<-EOF
 		pr verify
 
-		Verify that the current HEAD has at least one valid review signature relative to master
+		Verify that the current HEAD has at least a minimum number of valid review tags
 
 		TODO: detailed command usage
 		EOF
 		;;
-
-	"import" ) cat <<-EOF
-		pr import
-
-		Import public keys from .reviewers into local gpg keychain
-
-		TODO: detailed command usage
-		EOF
-		;;
-
 
 	"version" ) cat <<-EOF
 		pr version
@@ -158,37 +135,6 @@ error() {
 	reason="${1:-}"
 	code=1
 	case $reason in
-		"invalid_private_key" ) read -r -d '!!' template  <<-EOF
-			Unable to create signature.
-			This is not a valid private key according to GnuPG: "%s"
-			Please set a public public key in your git configuration that has a
-			valid local private key you control.
-			> gpg --list-secret-keys
-			> git config user.signingKey "YOURKEYID"
-		!!
-		EOF
-		code=10
-		;;
-
-		"verify_failed" ) read -r -d '!!' template  <<-EOF
-			Failed to find enough verifed signatures to satisfy: min_count=%s
-			Signature verification could fail simply because your local gnupg
-			keychain and trustdb does not contain the required keys.
-			For detailed signature status run:
-			> pr show
-		!!
-		EOF
-		code=20
-		;;
-
-		"gpg_status_fd" ) read -r -d '!!' template  <<-EOF
-			Unable to parse gpg's status-fd output.
-			%s
-		!!
-		EOF
-		code=30
-		;;
-
 		"sync" ) read -r -d '!!' template <<-EOF
 			Sync failed.
 			%s
@@ -230,138 +176,11 @@ error() {
 	exit $code
 }
 
-sig_subject() {
-	git -c diff.indentHeuristic=false diff-tree -p "$1"..HEAD \
-	| git patch-id --stable \
-	| cut -d' ' -f1
-}
-
-default_base() {
-	# are we signing the genesis commit?
-	git rev-parse -- "${1:-HEAD^}" 1>/dev/null 2>&1
-	if [ "$?" -eq 128 ]; then
-		echo "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-	else
-		echo "${1:-"$(git rev-parse HEAD^)"}"
-	fi
-}
-
-parse_sigstatus(){
-	local sig_key sig_time=0 sig_date sig_author sig_status
-	while read -r values; do
-		local status_code array pos
-		IFS=" " read -r -a array <<< "$values"
-		[[ "${array[0]}" == "[GNUPG:]" ]] || error "gpg_status_fd"
-		status_code=${array[1]}
-
-		# See `doc/DETAILS` in gnupg's repository for the message format
-		# https://git.gnupg.org/cgi-bin/gitweb.cgi?p=gnupg.git;a=blob_plain;f=doc/DETAILS
-		case $status_code in
-			NEWSIG)
-				sig_author="${sig_author:-Unknown User <${array[2]}>}"
-			;;
-			GOODSIG|EXPSIG|EXPKEYSIG|REVKEYSIG|BADSIG)
-				sig_key="${array[2]}"
-				pos=$((11+${#status_code}+${#sig_key}))
-				sig_author="${values:$pos}"
-				sig_status="$status_code"
-			;;
-			ERRSIG)
-				sig_key="${array[2]}"
-				sig_time="${array[6]}"
-				sig_status="$status_code"
-			;;
-			VALIDSIG)
-				sig_time="${array[4]}"
-				if [[ "$sig_status" == "GOODSIG" ]]; then
-					sig_status="$status_code"
-				fi
-			;;
-			TRUST_*)
-				sig_trust="${status_code//TRUST_/}"
-			;;
-			# Things that can be ignored
-			KEYEXPIRED);; # this message is also emitted for expired subkeys
-				      # EXPKEYSIG will be emitted for the key in question
-			KEYREVOKED);; # similarly
-			NO_PUBKEY);;  # will produce ERRSIG
-			KEY_CONSIDERED);;
-			SIG_ID);;
-			PLAINTEXT*);;
-			VERIFICATION_COMPLIANCE_MODE);;
-			# Fallback
-			*)
-				error "gpg_status_fd" "Unknown gpg status code $status_code"
-			;;
-		esac
-	done
-
-	sig_key="${sig_key:-UNKNOWN}"
-	sig_trust="${sig_trust:-UNKNOWN}"
-	if [[ "$sig_time" != 0 ]]; then
-		sig_date="$($DATE -d @"$sig_time")"
-	else
-		sig_date=UNKNOWN
-	fi
-
-	case "$sig_status" in
-	VALIDSIG) sig_status=VALID;;
-	GOODSIG)  error "gpg_status_fd" "gpg emited GOODSIG status but didn't emit VALIDSIG status, this is unexpected";;
-	EXPSIG);;
-	EXPKEYSIG) sig_status=EXPKEY;;
-	REVKEYSIG) sig_status=REVKEY;;
-	BADSIG) sig_status=INVALID;;
-	ERRSIG) sig_status=UNKNOWN;;
-	*) error "gpg_status_fd" "bad state";;
-	esac
-
-	printf "%s	%s	%s	%s	%s\\n" "$sig_key" "$sig_status" "$sig_trust" "$sig_date" "$sig_author"
-}
-
-get_sigs() {
-	local ref="$1"
-	local base="$2"
-	local trustdb="${3:-"./.reviewers"}"
-	git notes --ref signatures show "$ref" | grep -v "^$" | while IFS='' read -r line; do
-		gpg -vv --verify \
-		--status-fd=1 \
-		--trustdb-name="$trustdb" \
-		<(printf '%s' "$line" | openssl base64 -d -A) \
-		<(sig_subject "$base") 2>/dev/null \
-		| parse_sigstatus || true
-   done
-}
-
-pull_sigs() {
-	[ "$#" -eq 0 ] || { usage pull; exit 1; }
-
-	if git rev-parse refs/tags/new-signature >/dev/null 2>&1; then
-		git fetch origin refs/notes/signatures:refs/notes/origin/signatures +refs/tags/new-signature:refs/tags/origin/new-signature
-	else
-		git fetch origin refs/notes/signatures:refs/notes/origin/signatures
-	fi
-	git notes --ref signatures merge -s cat_sort_uniq origin/signatures
-}
-
-push_sigs() {
-	[ "$#" -eq 0 ] || { usage push; exit 1; }
-
-	echo -n "Pushing new review signature(s)..."
-	if git rev-parse refs/tags/new-signature >/dev/null 2>&1; then
-		git push origin refs/notes/signatures +refs/tags/new-signature >/dev/null 2>&1
-	else
-		git push origin refs/notes/signatures >/dev/null 2>&1
-	fi
-
-	echo "OK"
-}
-
 mark_pr_accepted() {
-	PR_INFO="$(hub pr list -f '%H %U' -s open -L 1)"
+	COMMIT="$1"
+	URL="$2"
 	USER="$(grep user "$HOME/.config/hub" | cut -d' ' -f3)"
 	TOKEN="$(grep token "$HOME/.config/hub" | cut -d' ' -f4)"
-	COMMIT="$(git rev-parse "$(cut -d' ' -f1 <<< "$PR_INFO")")"
-	URL="$(cut -d' ' -f2 <<< "$PR_INFO")"
 	PR_URL="$(sed -E 's/pull\/([0-9]+)/pulls\/\1\/reviews/ ; s/github\.com/api\.github\.com\/repos/' <<< "$URL")"
 	BODY="$(printf '{"commit_id": "%s", "event": "APPROVE", "body": "Accepted via `%s %s`"}' "$COMMIT" "$PROGRAM" "$VERSION")"
 
@@ -384,91 +203,63 @@ mark_pr_accepted() {
 }
 
 cmd_accept() {
-	local opts key_id push=1 accept=1 upstream
-	opts="$($GETOPT -o hpkns -l help,push,key,nopush,sigonly -n "$PROGRAM" -- "$@")";
+	local opts push=1 accept=1
+	opts="$($GETOPT -o hnt -l help,nopush,tagonly -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage add; exit 0 ;;
-		-k|--key) key_id="$2"; shift 2 ;;
-		-n|--no-push) push=0; shift ;;
-		-u|--upstream) upstream=$2; shift 2 ;;
-		-s|--sigonly) accept=0; shift ;;
+		-n|--nopush) push=0; shift ;;
+		-t|--tagonly) accept=0; shift ;;
 		--) shift; break ;;
 	esac done
 	[ "$#" != 1 ] && usage accept && exit 1
 
 	pr=${1}
-	key=${key_id:-$(git config user.signingKey)}
-	gpg --list-secret-keys "$key" &> /dev/null || {
-		error "invalid_private_key" "$key"; exit 1;
-	}
+	if [[ "$pr" =~ ^[0-9]+$ ]]; then
+		error "invalid pull request number: $pr"
+	fi
 
-	# TODO: validate pull request number before using
-	echo -n "Checking out pull request $pr..."
-	hub pr checkout "$pr" >/dev/null 2>&1
+	PR_INFO="$(hub pr list -f '%H %U' -s open -L 1)"
+	BRANCH="$(cut -d' ' -f1 <<< "$PR_INFO")"
+	COMMIT="$(git rev-parse "$BRANCH")"
+	URL="$(cut -d' ' -f2 <<< "$PR_INFO")"
+	echo -n "Fetching pull request $pr head branch $BRANCH..."
+	git fetch "origin/$BRANCH" > /dev/null 2>&1
 	echo "OK"
 
-	upstream="${upstream:-"$(hub pr list -h "$(git rev-parse --abbrev-ref HEAD)" -f '%B')"}"
-	base=$(default_base "$(git merge-base "$upstream" HEAD)")
-
-	# check for HEAD equal to base
-	[ "$(git rev-parse "$base")" == "$(git rev-parse HEAD)" ] && echo "error: cannot sign empty diff" && exit 1
-
-	[[ "$accept" == "0" ]] || mark_pr_accepted
-
-	echo -n "Creating review signature..."
-
-	sig_subject "$base" \
-	| gpg --detach-sign --local-user "$key" \
-	| openssl base64 -A \
-	| git notes --ref signatures append --file=-
-
-	TAG_TARGET=$(git rev-parse refs/notes/signatures 2>/dev/null) && git tag -f new-signature "$TAG_TARGET" >/dev/null 2>&1
-
+	echo -n "Creating review tag..."
+	REVIEWER_EMAIL="$(git config user.email)"
+	TAG_NAME="reviews/$REVIEWER_EMAIL-$(git rev-parse --short HEAD)"
+	git tag --sign -m "Changes on this branch were reviewed and accepted by the creator of this tag" "$TAG_NAME" "$COMMIT"
 	echo "OK"
 
-	[[ "$push" == "0" ]] || push_sigs
+	[[ "$accept" == "0" ]] || { echo -n "Marking pull request $pr as accepted..."; mark_pr_accepted "$COMMIT" "$URL"; echo "OK"; }
+	[[ "$push" == "0" ]] || { echo -n "Pushing review tag to origin..."; git push origin "$TAG_NAME" > /dev/null 2>&1; echo "OK"; }
 }
 
 cmd_show() {
-	local opts raw=0 from to="HEAD" trustdb="./.reviewers"
-	opts="$($GETOPT -o hrf:t:d: -l help,raw,from:,to:,trustdb: -n "$PROGRAM" -- "$@")";
+	local opts raw=0
+	opts="$($GETOPT -o hr -l help,raw -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage show; exit 0;;
 		-r|--raw) raw=1; shift;;
-		-f|--from) from="$2"; shift 2;;
-		-t|--to) to="$2"; shift 2;;
-		-d|--trustdb) trustdb="$2"; shift 2;;
 		--) shift; break;;
 	esac done
-	[ "$#" -gt 7 ] && usage show && exit 1
-	ref="$(git rev-parse --abbrev-ref "$to" 2>/dev/null)"
-	head="$(git rev-parse "$to")"
-	from="${from:-"$(hub pr list -h "$ref" -f '%B')"}"
-	base=$(default_base "$(git rev-parse "$from" 2>/dev/null)")
+	[ "$#" -gt 1 ] && usage show && exit 1
 
-	if [ "$base" == "$head" ]; then
-		base="$(git rev-parse HEAD^)"
-	fi
-
+	COMMIT="$(git rev-parse HEAD)"
+	FORMAT_SCRIPT="%(if:notequals=<$(git config user.email)>)%(taggeremail)%(then)%(taggeremail): Valid Review Tag%(end)"
+	valid_signed_tags=$(git for-each-ref \
+		--points-at "$COMMIT" \
+		--format "$FORMAT_SCRIPT" \
+		refs/tags/reviews | grep -c v \
+	)
 	if [ "$raw" -ne 1 ]; then
-		printf "Signatures for commits between %.10s and %.10s\\n" "$base" "$head"
-		printf " %-16s | %-10s | %-9s | %-28s | %-50s \\n" \
-			"Public Key ID" "Status" "Trust" "Date" "Signer Name"
-		printf "=%.0s" {1..119}
-		printf "\\n"
+		printf "Review tags for commit %s\\n" "$COMMIT"
 	fi
 
-	get_sigs "$head" "$base" "$trustdb" | while IFS='' read -r sig_parsed; do
-		[ "$raw" -eq "1" ] && echo "$sig_parsed" && continue
-		printf " %-16s | %-10s | %-9s | %28s | %-50s\\n" \
-			"$(cut -f1 <<< "$sig_parsed")" \
-			"$(cut -f2 <<< "$sig_parsed")" \
-			"$(cut -f3 <<< "$sig_parsed")" \
-			"$(cut -f4 <<< "$sig_parsed")" \
-			"$(cut -f5 <<< "$sig_parsed")"
-	done
+	echo "$valid_signed_tags"
 }
 
 update_pr() {
@@ -527,7 +318,7 @@ create_pr() {
 	# [ ! -z "$ASSIGNEES" ] && PR_CREATE_ARGS="$PR_CREATE_ARGS -a $ASSIGNEES"
 
 	# make sure all local commits are pushed up to origin
-	if [ "$(git rev-parse origin/$BRANCH_NAME 2>&1 >/dev/null)" != "$(git rev-parse $BRANCH_NAME)" ]; then
+	if [ "$(git rev-parse "origin/$BRANCH_NAME" 2>&1 >/dev/null)" != "$(git rev-parse "$BRANCH_NAME")" ]; then
 		echo "Updating out of date remote branch origin/$BRANCH_NAME..."
 		git push origin "$BRANCH_NAME" > /dev/null 2>&1
 	fi
@@ -541,7 +332,7 @@ cmd_sync() {
 	[ "$#" -eq 0 ] || { usage sync; exit 1; }
 
 	BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
-	[ "$BRANCH_NAME" == "master" ] && error "branch" "$BRANCH_NAME" "Cannot create pull request with commits made directly on local master"
+	[ "$BRANCH_NAME" == "$UPSTREAM" ] && error "branch" "$BRANCH_NAME" "Cannot create pull request with commits made directly on local upstream branch $UPSTREAM"
 	PR_NUMBER="$(hub pr list -h "$BRANCH_NAME" -s open -f '%I' -L 1 2> /dev/null || echo -n 0)"
 
 	# check for existing open pr for this branch
@@ -564,16 +355,15 @@ merge_pr() {
 	BRANCH_NAME="$1"
 	PR_NUMBER="$2"
 
-	echo "Merging branch $BRANCH_NAME (pull request #$PR_NUMBER) into branch master..."
-	FIRST_BRANCH_COMMIT="$(git log master.."$BRANCH_NAME" -1 --pretty='format:%H')"
-	git checkout master
-	git pull origin master # 1 tap
+	echo "Merging branch $BRANCH_NAME (pull request #$PR_NUMBER) into branch $UPSTREAM..."
+	FIRST_BRANCH_COMMIT="$(git log "$UPSTREAM".."$BRANCH_NAME" -1 --pretty='format:%H')"
+	git checkout "$UPSTREAM"
+	git pull origin "$UPSTREAM" # 1 tap
 	git merge --squash "$BRANCH_NAME"
 	# reuse first commit message from feature branch, but allow editing before commit
-	# TODO: better commit message for final commit in master
+	# TODO: better commit message for final commit in upstream
 	git commit -c "$FIRST_BRANCH_COMMIT" # 2 tap
-	git notes --ref signatures copy "$BRANCH_NAME" master
-	git push origin master ":$BRANCH_NAME" # 3 tap
+	git push origin "$UPSTREAM" ":$BRANCH_NAME" # 3 tap
 	git branch -D "$BRANCH_NAME"
 }
 
@@ -585,72 +375,39 @@ cmd_merge() {
 		error "Failed to find open pull request for branch $BRANCH_NAME"
 	fi
 
+	cmd_verify > /dev/null 2>&1
+
 	# TODO: check ci status once github bot is functional
 	# this should cover the following checks:
-	# 1) review signature verification
-	# 2) lint status
-	# 3) test status
+	# 1) lint status
+	# 2) test status
 	merge_pr "$BRANCH_NAME" "$PR_NUMBER"
 }
 
-cmd_init() {
-	[ "$#" -eq 0 ] || { usage init; exit 1; }
-	echo -n "Setting git configuration..."
-	git config --add \
-		remote.origin.fetch \
-		"+refs/notes/signatures:refs/notes/signatures"
-	git config --add \
-		remote.origin.fetch \
-		"+refs/tags/new-signature:refs/tags/new-signature"
-	git config --add \
-		remote.origin.push \
-		"+refs/notes/signatures:refs/notes/signatures"
-	git config --add \
-		notes.rewriteRef \
-		"refs/notes/signatures"
-	git config --add \
-		remote.origin.push \
-		"+refs/tags/new-signature:refs/tags/new-signature"
-	echo "OK"
-}
-
 cmd_verify() {
-	local opts min_count=1 from="HEAD^" to="HEAD" trustdb="./.reviewers"
-	opts="$($GETOPT -o hf:t:m:d: -l help,from:,to:,min-count:,trustdb: -n "$PROGRAM" -- "$@")";
+	local opts min_count=1
+	opts="$($GETOPT -o hm: -l help,min-count: -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage verify; exit 0;;
 		-m|--min-count) min_count="$2"; shift 2 ;;
-		-f|--from) from="$2"; shift 2 ;;
-		-t|--to) to="$2"; shift 2 ;;
-		-d|--trustdb) trustdb="$2"; shift 2 ;;
 		--) shift; break ;;
 	esac done
-	[ "$#" -gt 8 ] && usage verify && exit 1
-	valid_count=$( \
-		cmd_show --from "$from" --to "$to" --trustdb "$trustdb" \
-		| grep "ULTIMATE" \
-		| awk -F"|" '{ print $1 }' \
-		| uniq \
-		| grep -cvE "$(git log --pretty='format:%GK' "$from".."$to" | uniq | paste -s -d'|' -)" || true
+	[ "$#" -gt 0 ] && usage verify && exit 1
+	# make sure tip of merged branch has at least the minimum number of signed review tags
+	local valid_signed_tags=0
+	FORMAT_SCRIPT="%(if:notequals=<$(git config user.email)>)%(taggeremail)%(then)v%(end)"
+	valid_signed_tags=$(git for-each-ref \
+		--points-at "$BRANCH_NAME" \
+		--format "$FORMAT_SCRIPT" \
+		refs/tags/reviews | grep -c v \
 	)
 
-	[[ "$valid_count" -ge "$min_count" ]] || \
-		{ error "verify_failed" "$min_count"; exit 1; }
-}
-
-cmd_import() {
-	local trustdb='./.reviewers' keyserver='hkp://keyserver.ubuntu.com:80'
-	opts="$($GETOPT -o ht:k: -l help,trustdb:,keyserver: -n "$PROGRAM" -- "$@")";
-	eval set -- "$opts"
-	while true; do case $1 in
-		-h|--help) usage import; exit 0;;
-		-d|--trustdb) trustdb="$2"; shift 2 ;;
-		-k|--keyserver) keyserver="$2"; shift 2 ;;
-		--) shift; break ;;
-	esac done
-	[ "$#" -gt 2 ] && { usage import; exit 1; }
-	gpg --keyserver "$keyserver" --recv-keys "$(gpg --trustdb-name="$trustdb" --export-ownertrust | grep -v '^#.*$'  | cut -d: -f1)"
+	if [[ "$valid_signed_tags" -lt "$min_count" ]]; then
+		echo "Error: Failed to find enough signed review tags to satisfy minimum review requirement."
+		echo "Error: $valid_signed_tags reviews were found, but $min_count are required"
+		exit 1
+	fi
 }
 
 cmd_version() {
