@@ -48,10 +48,10 @@ usage() {
 			Create or update a github pull request from a local branch
 
 		* pr merge
-			Merge a branch for a github pull request which has been accepted
+			Merge a branch for a github pull request which has been approveed
 
-		* pr accept [--nopush] [--tag-only]
-			Accept a github pull request and create review tag
+		* pr approve [--nopush] [--tag-only]
+			Approve a github pull request and create review tag
 
 		* pr show [--noheader]
 			Show review tags for the current HEAD
@@ -71,13 +71,13 @@ usage() {
 		EOF
 		;;
 
-	"accept" ) cat <<-EOF
-		pr accept <pr number> [--nopush] [--tag-only]
+	"approve" ) cat <<-EOF
+		pr approve <pr number> [--nopush] [--tag-only]
 
-		Accept a github pull request and create review tag
+		Approve a github pull request and create review tag
 
 		--nopush: Do not push review tag to remote repo
-		--tag-only: Do not accept pull request on github and only create review tag.
+		--tag-only: Do not approve pull request on github and only create review tag.
 			Review tag will still be pushed to remote repo unless --nopush is given.
 		EOF
 		;;
@@ -85,7 +85,7 @@ usage() {
 	"merge" ) cat <<-EOF
 		pr merge
 
-		Merge branch for a github pull request which has been accepted.
+		Merge branch for a github pull request which has been approveed.
 
 		The branch to merge must be the currently checked out branch.
 		EOF
@@ -119,42 +119,42 @@ usage() {
 	esac
 }
 
-mark_pr_accepted() {
+mark_pr_approveed() {
 	COMMIT="$1"
 	URL="$2"
 	USER="$(grep user "$HOME/.config/hub" | cut -d' ' -f3)"
 	TOKEN="$(grep token "$HOME/.config/hub" | cut -d' ' -f4)"
 	PR_URL="$(sed -E 's/pull\/([0-9]+)/pulls\/\1\/reviews/ ; s/github\.com/api\.github\.com\/repos/' <<< "$URL")"
   # shellcheck disable=2016
-	BODY="$(printf '{"commit_id": "%s", "event": "APPROVE", "body": "Accepted via `%s %s`"}' "$COMMIT" "$PROGRAM" "$VERSION")"
+	BODY="$(printf '{"commit_id": "%s", "event": "APPROVE", "body": "Approveed via `%s %s`"}' "$COMMIT" "$PROGRAM" "$VERSION")"
 
 	if ! RESULT="$(curl -sfS \
 	-H "Authorization: Bearer $TOKEN" \
 	-H "Content-Type: application/json" \
-	-H "Accept: application/json" \
+	-H "Approve: application/json" \
 	--data "$BODY" \
 	"$PR_URL" 2>&1)"; then
 		if echo "$RESULT" | grep '422 Unprocessable Entity' >/dev/null 2>&1; then
-			printf "\\nerror: unable to accept own pull request\\n"
+			printf "\\nerror: unable to approve own pull request\\n"
 			exit 1
 		fi
-		printf "\\nEncountered error from github while attempting to mark pr accepted:\\n%s\\n" "$RESULT"
+		printf "\\nEncountered error from github while attempting to mark pr approveed:\\n%s\\n" "$RESULT"
 	else
 		echo "OK"
 	fi
 }
 
-cmd_accept() {
-	local opts push=1 accept=1
+cmd_approve() {
+	local opts push=1 approve=1
 	opts="$($GETOPT -o hnt -l help,nopush,tagonly -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage add; exit 0 ;;
 		-n|--nopush) push=0; shift ;;
-		-t|--tagonly) accept=0; shift ;;
+		-t|--tagonly) approve=0; shift ;;
 		--) shift; break ;;
 	esac done
-	[ "$#" != 1 ] && usage accept && exit 1
+	[ "$#" != 1 ] && usage approve && exit 1
 
 	pr=${1}
 	if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
@@ -175,7 +175,7 @@ cmd_accept() {
 		exit 1
 	fi
 
-	[[ "$accept" == "0" ]] || { echo -n "Marking pull request $pr as accepted..."; mark_pr_accepted "$COMMIT" "$URL"; echo "OK"; }
+	[[ "$approve" == "0" ]] || { echo -n "Marking pull request $pr as approveed..."; mark_pr_approveed "$COMMIT" "$URL"; echo "OK"; }
 
 	echo -n "Checking out pull request $pr..."
 	if r="$(hub pr checkout "$pr")"; then
@@ -191,7 +191,7 @@ cmd_accept() {
 	echo "OK"
 
 	echo -n "Creating review tag..."
-	git tag --sign -m "Changes on this branch were reviewed and accepted by the creator of this tag" "$TAG_NAME" "$COMMIT"
+	git tag --sign -m "Changes on this branch were reviewed and approveed by the creator of this tag" "$TAG_NAME" "$COMMIT"
 	echo "OK"
 
 	[[ "$push" == "0" ]] || { echo -n "Pushing review tag to origin..."; git push origin "$TAG_NAME" > /dev/null 2>&1; echo "OK"; }

@@ -1,5 +1,5 @@
 # `pr`
-`pr` is a CLI tool for creating, updating, accepting, and landing github pull requests.
+`pr` is a CLI tool for creating, updating, approving, and landing github pull requests.
 
 # Installation
 
@@ -38,10 +38,10 @@ Commands
   Create or update a github pull request from a local branch
 
 * pr merge
-  Merge a github pull request which has been accepted
+  Merge a github pull request which has been approved
 
-* pr accept [--nopush] [--tag-only]
-  Accept a github pull request and create review tag
+* pr approve [--nopush] [--tag-only]
+  Approve a github pull request and create review tag
 
 * pr show [--raw]
   Show review tags for the current HEAD
@@ -78,20 +78,20 @@ Pull request successfully created: https://github.com/BitGo/shared-review-flow-t
 
 You can then send the pull request URL to another engineer for review.
 
-## Accepting a pull request
+## Approving a pull request
 
-When someone has sent you a pull request URL for review, the first step is looking at the changes in github. Once you are ready to accept the pull request,
-run the accept command and pass the pull request number.
+When someone has sent you a pull request URL for review, the first step is looking at the changes in github. Once you are ready to approve the pull request,
+run the approve command and pass the pull request number.
 
 ```
-pr accept 12
+pr approve 12
 ```
 
-This will mark the pull request as accepted, create a review tag, and push the review tag to the remote repository.
+This will mark the pull request as approved, create a review tag, and push the review tag to the remote repository.
 
 ## Merging a pull request
 
-Once you have your pull request accepted by another engineer, you can run the merge command to incorporate your change into the upstream branch.
+Once you have your pull request approved by another engineer, you can run the merge command to incorporate your change into the upstream branch.
 
 First, checkout the branch you want to merge:
 ```
@@ -139,20 +139,20 @@ Additionally, the review tags which were applied to the `my-feature` branch will
 Create or update a github pull request from a local branch.
 
 ## `pr merge`
-Merge a branch for a github pull request which has been accepted.
+Merge a branch for a github pull request which has been approved.
 
-## `pr accept <pr number>`
-Accept a github pull request and create review tag.
+## `pr approve <pr number>`
+Approve a github pull request and create review tag.
 
 ### Arguments
-#### `<pr number>`: pull request number to accept
+#### `<pr number>`: pull request number to approve
 
 ### Options
 #### --nopush
 Do not push the review signature to the remote repository.
 
 #### --tag-only
-Skip marking the pull request as accepted in github. This will only cause a review tag to be created and pushed to the remote repository (unless `--nopush` is used, in which case the review tag will only exist in your local repository).
+Skip marking the pull request as approved in github. This will only cause a review tag to be created and pushed to the remote repository (unless `--nopush` is used, in which case the review tag will only exist in your local repository).
 
 ## `pr show`
 Show review tag(s) for the current HEAD.
@@ -167,7 +167,7 @@ Verify review signature(s) for a commit range.
 
 ### Options
 **--min-count**
-Minimum number of review signatures required for acceptance of a commit range. Defaults to 1.
+Minimum number of review signatures required for approveance of a commit range. Defaults to 1.
 
 ## `pr version`
 Show `pr` version information.
