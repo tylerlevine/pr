@@ -45,74 +45,74 @@ usage() {
 		--------
 
 		* pr sync
-			Create or update a github pull request from a branch
+			Create or update a github pull request from a local branch
 
 		* pr merge
 			Merge a github pull request which has been accepted
 
-		* pr accept
-			Accept a github pull request and apply review signature
+		* pr accept [--nopush] [--tag-only]
+			Accept a github pull request and create review tag
 
-		* pr show
-			Show review signatures for the current HEAD
+		* pr show [--raw]
+			Show review tags for the current HEAD
 
 		* pr verify
 			Verify that the current HEAD has at least the minimum number of valid review tags
 
 		* pr version
-			Report the version number
+			Print the current version
 		EOF
 		;;
 
 	"sync" ) cat <<-EOF
 		pr sync
 
-		Setup your repository for usage with pr
-
-		TODO: detailed command usage
+		Create or update a github pull request from a local branch
 		EOF
 		;;
 
 	"accept" ) cat <<-EOF
-		pr accept
+		pr accept <pr number> [--nopush] [--tag-only]
 
-		Accept a github pull request and apply review signature
+		Accept a github pull request and create review tag
 
-		TODO: detailed command usage
+		--nopush: Do not push review tag to remote repo
+		--tag-only: Do not accept pull request on github and only create review tag.
+			Review tag will still be pushed to remote repo unless --nopush is given.
 		EOF
 		;;
 
 	"merge" ) cat <<-EOF
-		pr merge [options]
+		pr merge
 
-		Merge a github pull request which has been accepted
+		Merge branch for a github pull request which has been accepted.
 
-		TODO: detailed command usage
+		The branch to merge must be the currently checked out branch.
 		EOF
 		;;
 
 	"show" ) cat <<-EOF
-		pr show [options]
+		pr show [--noheader]
 
-		Show review signature tags for the current HEAD
+		Show review tags for the current HEAD
 
-		TODO: detailed command usage
+			--noheader: Do not output header containing number of valid review tags
 		EOF
 		;;
 
 	"verify" ) cat <<-EOF
-		pr verify
+		pr verify [--min-count 1]
 
 		Verify that the current HEAD has at least a minimum number of valid review tags
 
-		TODO: detailed command usage
+			--min-count: Minimum number of valid review tags required for verification (Default 1).
 		EOF
 		;;
 
 	"version" ) cat <<-EOF
 		pr version
 
-		Print current version.
+		Print current version
 		EOF
 		;;
 
@@ -197,12 +197,12 @@ cmd_accept() {
 }
 
 cmd_show() {
-	local opts raw=0
-	opts="$($GETOPT -o hr -l help,raw -n "$PROGRAM" -- "$@")";
+	local opts header=1
+	opts="$($GETOPT -o hn -l help,noheader -n "$PROGRAM" -- "$@")";
 	eval set -- "$opts"
 	while true; do case $1 in
 		-h|--help) usage show; exit 0;;
-		-r|--raw) raw=1; shift;;
+		-n|--noheader) header=0; shift;;
 		--) shift; break;;
 	esac done
 	[ "$#" -gt 1 ] && usage show && exit 1
@@ -218,7 +218,7 @@ cmd_show() {
 	if ! valid_count="$(grep -c "Valid Review Tag" <<< "$valid_signed_tags")"; then
 		valid_count=0
 	fi
-	[[ "$raw" != 1 ]] && printf "$valid_count valid review tag(s) for commit %s\\n" "$COMMIT"
+	[[ "$header" != 0 ]] && printf "$valid_count valid review tag(s) for commit %s\\n" "$COMMIT"
 	[[ -n "$valid_signed_tags" ]] && echo "$valid_signed_tags"
 }
 
