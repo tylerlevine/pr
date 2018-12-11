@@ -23,8 +23,6 @@ EOF
 )"
 
 main(){
-	path_check git openssl xargs gpg || exit 1
-
 	case $COMMAND in
 		""|"-h"|"--help"|"help"|"usage") usage; exit 0;;
 		"-v"|"--version") cmd_version; exit 0;;
@@ -34,16 +32,6 @@ main(){
 
 	shift;
 	"cmd_$COMMAND" "$@"
-}
-
-path_check() {
-	for item in "$@"; do
-		if ! command -v "$item" >/dev/null; then
-			printf "%s not found in \$PATH \\n" "$item";
-			return 1;
-		fi
-	done
-	return 0
 }
 
 usage() {
