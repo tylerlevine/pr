@@ -367,12 +367,11 @@ cmd_verify() {
 	# make sure tip of merged branch has at least the minimum number of signed review tags
 	local valid_signed_tags=0
 	BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD)"
-	PR_NUMBER="$(hub pr list -h "$BRANCH_NAME" -s open -f '%I' -L 1)"
 	FORMAT_SCRIPT="%(if:notequals=<$(git config user.email)>)%(taggeremail)%(then)v%(end)"
 	valid_signed_tags=$(git for-each-ref \
 		--points-at "$BRANCH_NAME" \
 		--format "$FORMAT_SCRIPT" \
-		refs/tags/reviews | grep -c v \
+		refs/tags/reviews | grep -c v || true \
 	)
 
 	if [[ "$valid_signed_tags" -lt "$min_count" ]]; then
