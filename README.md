@@ -38,7 +38,7 @@ Commands
   Create or update a github pull request from a local branch
 
 * pr merge
-  Merge a github pull request which has been approveed
+  Merge a github pull request which has been approved
 
 * pr approve [--nopush] [--tag-only]
   Approve a github pull request and create review tag
@@ -87,11 +87,11 @@ run the approve command and pass the pull request number.
 pr approve 12
 ```
 
-This will mark the pull request as approveed, create a review tag, and push the review tag to the remote repository.
+This will mark the pull request as approved, create a review tag, and push the review tag to the remote repository.
 
 ## Merging a pull request
 
-Once you have your pull request approveed by another engineer, you can run the merge command to incorporate your change into the upstream branch.
+Once you have your pull request approved by another engineer, you can run the merge command to incorporate your change into the upstream branch.
 
 First, checkout the branch you want to merge:
 ```
@@ -139,7 +139,7 @@ Additionally, the review tags which were applied to the `my-feature` branch will
 Create or update a github pull request from a local branch.
 
 ## `pr merge`
-Merge a branch for a github pull request which has been approveed.
+Merge a branch for a github pull request which has been approved.
 
 ## `pr approve <pr number>`
 Approve a github pull request and create review tag.
@@ -152,7 +152,7 @@ Approve a github pull request and create review tag.
 Do not push the review signature to the remote repository.
 
 #### --tag-only
-Skip marking the pull request as approveed in github. This will only cause a review tag to be created and pushed to the remote repository (unless `--nopush` is used, in which case the review tag will only exist in your local repository).
+Skip marking the pull request as approved in github. This will only cause a review tag to be created and pushed to the remote repository (unless `--nopush` is used, in which case the review tag will only exist in your local repository).
 
 ## `pr show`
 Show review tag(s) for the current HEAD.
