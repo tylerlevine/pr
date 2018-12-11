@@ -1,5 +1,5 @@
 # `pr`
-`pr` is a compatible command line tool for creating, updating, accepting, and landing pull github pull requests in a verifiably secure way.
+`pr` is a CLI tool for creating, updating, accepting, and landing pull github pull requests.
 
 `pr` is a bash script which currently supports both bash and zsh.
 
