@@ -48,12 +48,12 @@ usage() {
 			Create or update a github pull request from a local branch
 
 		* pr merge
-			Merge a github pull request which has been accepted
+			Merge a branch for a github pull request which has been accepted
 
 		* pr accept [--nopush] [--tag-only]
 			Accept a github pull request and create review tag
 
-		* pr show [--raw]
+		* pr show [--noheader]
 			Show review tags for the current HEAD
 
 		* pr verify

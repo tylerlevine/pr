@@ -8,18 +8,15 @@
 ## Install Dependencies
 Before installing, ensure that the following binaries are available:
 * git
-* openssl
-* xargs
-* gpg
+* hub
 
 These packages can be installed from most package managers if needed (eg, brew, apt, etc).
 
 ### Mac OS X
-On Mac OS X, a few additional packages are required:
+On Mac OS X, one additional package is required:
 * gnu-getopt
-* gdate
 
-To install these, run `brew install gnu-getopt coreutils`.
+To install, run `brew install gnu-getopt`.
 
 ## Install `pr`
 
@@ -34,35 +31,28 @@ Make it executable:
 Now running the `pr` command should print the usage information:
 
 ```
-$ pr
 pr <command> [<args>]
 
 Commands
 --------
 
-* pr init
-Setup your repository for usage with pr
-
 * pr sync
-Create or update a github pull request from a branch
+  Create or update a github pull request from a local branch
 
 * pr merge
-Merge a github pull request which has been accepted
+  Merge a github pull request which has been accepted
 
-* pr accept
-Accept a github pull request and apply review signature
+* pr accept [--nopush] [--tag-only]
+  Accept a github pull request and create review tag
 
-* pr show
-Show review signatures for the current HEAD
+* pr show [--raw]
+  Show review tags for the current HEAD
 
 * pr verify
-Verify that the current HEAD has at least one valid review signature relative to master
-
-* pr import
-Import public keys from .reviewers into local keychain
+  Verify that the current HEAD has at least the minimum number of valid review tags
 
 * pr version
-Report the version number
+  Print the current version
 ```
 
 # Basic Usage
@@ -75,13 +65,18 @@ git checkout -b my-feature
 Then you can make a few commits to the `my-feature` branch to implement your change.
 
 ## Creating a pull request
-Once you are ready to create a pull request from this branch for review, run the sync command.
-
-```
-pr sync
-```
+Once you are ready to create a pull request from this branch for review, run the `pr sync` command.
 
 This will prompt you for the pull request message, then push your branch to the remote repository, and create a pull request against `master`.
+
+```
+$ pr sync
+No open pull request found for local branch my-feature
+Create a new pull request? [Y/n]
+Creating new PR for branch my-feature...
+Updating out of date remote branch origin/my-feature...
+Pull request successfully created: https://github.com/BitGo/shared-review-flow-test-repo/pull/6
+```
 
 You can then send the pull request URL to another engineer for review.
 
@@ -94,59 +89,80 @@ run the accept command and pass the pull request number.
 pr accept 12
 ```
 
-This will create a review signature, push the review signature to the remote repository, and mark the pull request as accepted with a comment.
+This will mark the pull request as accepted, create a review tag, and push the review tag to the remote repository.
 
 ## Merging a pull request
 
 Once you have your pull request accepted by another engineer, you can run the merge command to incorporate your change into the upstream branch.
 
+First, checkout the branch you want to merge:
 ```
-pr merge
+git checkout BG-2-new-branch
 ```
 
-This will squash all the commits on the `my-feature` branch, and then rebase the squashed commit on the latest version of `master`. You will have a change to edit the resulting commit message in your editor before the commit is made.
+Then run the `pr merge` command to merge the local branch into the upstream branch (usually master).
 
-Additionally, the review signatures which were applied to the `my-feature` branch will be copied onto the new commit in `master`. The new version of `master` is then pushed to the remote repository, and the `my-feature` branch is deleted from both the remote and local repositories.
+```
+$ pr merge
+Merging branch my-feature (pull request #3) into branch master...
+Switched to branch 'master'
+Your branch is up to date with 'origin/master'.
+From github.com:BitGo/shared-review-flow-test-repo
+ * branch            master     -> FETCH_HEAD
+Already up to date.
+Updating ffcd477..b38eb54
+Fast-forward
+Squash commit -- not updating HEAD
+ README.md | 1 +
+ 1 file changed, 1 insertion(+)
+[master a87b310] Make change to readme
+ Date: Mon Dec 10 15:40:12 2018 -0800
+ 1 file changed, 1 insertion(+)
+Enumerating objects: 5, done.
+Counting objects: 100% (5/5), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 1018 bytes | 1018.00 KiB/s, done.
+Total 3 (delta 1), reused 0 (delta 0)
+remote: Resolving deltas: 100% (1/1), completed with 1 local object.
+To github.com:BitGo/shared-review-flow-test-repo.git
+ - [deleted]         my-feature
+   ffcd477..a87b310  master -> master
+Deleted branch my-feature (was b38eb54).
+```
+
+This will squash all the commits on the `my-feature` branch, and then rebase the squashed commit on the latest version of `master`. You will have a chance to edit the resulting commit message in your editor before the commit is made.
+
+Additionally, the review tags which were applied to the `my-feature` branch will be copied onto the new commit in `master`. The new version of `master` is then pushed to the remote repository, and the `my-feature` branch is deleted from both the remote and local repositories.
 
 # Command Reference
-
-## `pr init`
-Setup local repository for usage with `pr`.
 
 ## `pr sync`
 Create or update a github pull request from a local branch.
 
 ## `pr merge`
-Merge a github pull request which has been accepted.
+Merge a branch for a github pull request which has been accepted.
 
-## `pr accept`
-Accept a github pull request and apply a review signature.
+## `pr accept <pr number>`
+Accept a github pull request and create review tag.
+
+### Arguments
+#### `<pr number>`: pull request number to accept
 
 ### Options
-#### --key
-Specify which gpg key should be used when creating review signature.
-
-#### --no-push
+#### --nopush
 Do not push the review signature to the remote repository.
 
-#### --upstream
-Override the upstream branch of the pull request. Defaults to the target branch which the pull request will be merged into.
-
-#### --sigonly
-Skip marking the pull request as accepted in github. This will only cause a review signature to be created and pushed to the remote repository (unless `--no-push` is used, in which case the review signature will only exist in your local repository).
+#### --tag-only
+Skip marking the pull request as accepted in github. This will only cause a review tag to be created and pushed to the remote repository (unless `--nopush` is used, in which case the review tag will only exist in your local repository).
 
 ## `pr show`
-Print review signature(s) for a commit range.
+Show review tag(s) for the current HEAD.
 
 ### Options
-**--raw**
-Skip printing headers and labels. This may be useful if consuming review signatures programatically.
+**--noheader**
+Skip printing headers and labels. This may be useful if consuming review tags programatically.
 
-**--from**
-Specify the ref which represents the beginning of the commit range. Defaults to the pull request base branch.
-
-**--to**
-Specify the ref which represents the end of the commit range. Defaults to `HEAD`.
 
 ## `pr verify`
 Verify review signature(s) for a commit range.
@@ -154,25 +170,6 @@ Verify review signature(s) for a commit range.
 ### Options
 **--min-count**
 Minimum number of review signatures required for acceptance of a commit range. Defaults to 1.
-
-**--from**
-Specify the ref which represents the beginning of the commit range. Defaults to `HEAD^`.
-
-**--to**
-Specify the ref which represents the end of the commit range. Defaults to `HEAD`.
-
-**--trustdb**
-Specify the gpg trustdb which review signatures should be evaluated against. Defaults to `.reviewers`.
-
-## `pr import`
-Import public keys from repository trustdb into local gpg keychain.
-
-### Options
-**--trustdb**
-Specify the gpg trustdb from which reviewer public keys should be imported. Defaults to `.reviewers`.
-
-**--keyserver**
-Specify the gpg keyserver from which reviewer public keys should be retrieved. Defaults to `hkp://keyserver.ubuntu.com:80`.
 
 ## `pr version`
 Show `pr` version information.
