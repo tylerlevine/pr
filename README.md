@@ -1,7 +1,5 @@
 # `pr`
-`pr` is a CLI tool for creating, updating, accepting, and landing pull github pull requests.
-
-`pr` is a bash script which currently supports both bash and zsh.
+`pr` is a CLI tool for creating, updating, accepting, and landing github pull requests.
 
 # Installation
 
@@ -173,6 +171,10 @@ Minimum number of review signatures required for acceptance of a commit range. D
 
 ## `pr version`
 Show `pr` version information.
+
+# Supported Shells
+
+`pr` currently supports both bash and zsh.
 
 # License
 
