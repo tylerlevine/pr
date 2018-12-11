@@ -125,6 +125,7 @@ mark_pr_accepted() {
 	USER="$(grep user "$HOME/.config/hub" | cut -d' ' -f3)"
 	TOKEN="$(grep token "$HOME/.config/hub" | cut -d' ' -f4)"
 	PR_URL="$(sed -E 's/pull\/([0-9]+)/pulls\/\1\/reviews/ ; s/github\.com/api\.github\.com\/repos/' <<< "$URL")"
+  # shellcheck disable=2016
 	BODY="$(printf '{"commit_id": "%s", "event": "APPROVE", "body": "Accepted via `%s %s`"}' "$COMMIT" "$PROGRAM" "$VERSION")"
 
 	if ! RESULT="$(curl -sfS \
@@ -338,15 +339,11 @@ cmd_merge() {
 		exit 1
 	fi
 
-	cmd_verify
-
-	# TODO: check ci status once github bot is functional
-	# this should cover the following checks:
-	# 1) lint status
-	# 2) test status
-	merge_pr "$BRANCH_NAME" "$PR_NUMBER"
+	# shellcheck disable=SC2119
+	cmd_verify && merge_pr "$BRANCH_NAME" "$PR_NUMBER"
 }
 
+# shellcheck disable=SC2120
 cmd_verify() {
 	local opts min_count=1
 	opts="$($GETOPT -o hm: -l help,min-count: -n "$PROGRAM" -- "$@")";
