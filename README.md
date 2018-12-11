@@ -1,5 +1,5 @@
 # `pr`
-`pr` is a CLI tool for creating, updating, approveing, and landing github pull requests.
+`pr` is a CLI tool for creating, updating, approving, and landing github pull requests.
 
 # Installation
 
@@ -78,7 +78,7 @@ Pull request successfully created: https://github.com/BitGo/shared-review-flow-t
 
 You can then send the pull request URL to another engineer for review.
 
-## Approveing a pull request
+## Approving a pull request
 
 When someone has sent you a pull request URL for review, the first step is looking at the changes in github. Once you are ready to approve the pull request,
 run the approve command and pass the pull request number.
