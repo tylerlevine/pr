@@ -97,7 +97,7 @@ Once you have your pull request accepted by another engineer, you can run the me
 
 First, checkout the branch you want to merge:
 ```
-git checkout BG-2-new-branch
+git checkout my-feature
 ```
 
 Then run the `pr merge` command to merge the local branch into the upstream branch (usually master).
