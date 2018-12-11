@@ -127,8 +127,6 @@ mark_pr_accepted() {
 	PR_URL="$(sed -E 's/pull\/([0-9]+)/pulls\/\1\/reviews/ ; s/github\.com/api\.github\.com\/repos/' <<< "$URL")"
 	BODY="$(printf '{"commit_id": "%s", "event": "APPROVE", "body": "Accepted via `%s %s`"}' "$COMMIT" "$PROGRAM" "$VERSION")"
 
-	echo -n "Marking pull request as accepted..."
-
 	if ! RESULT="$(curl -sfS \
 	-H "Authorization: Bearer $TOKEN" \
 	-H "Content-Type: application/json" \
@@ -163,8 +161,22 @@ cmd_accept() {
 		exit 1
 	fi
 
+	PR_INFO="$(hub pr list -h "$(git rev-parse --abbrev-ref HEAD)" -f '%H %U' -s open -L 1)"
+	BRANCH="$(cut -d' ' -f1 <<< "$PR_INFO")"
+	URL="$(cut -d' ' -f2 <<< "$PR_INFO")"
+	COMMIT="$(git rev-parse "$BRANCH")"
+	REVIEWER_EMAIL="$(git config user.email)"
+	TAG_NAME="reviews/$REVIEWER_EMAIL-$(git rev-parse --short HEAD)"
+
+	# check for existing review tag on this commit
+	if git rev-parse "refs/tags/$TAG_NAME^{tag}" > /dev/null 2>&1; then
+		echo "Error: Review tag $TAG_NAME already exists for commit $(git rev-parse --short "$COMMIT")"
+		exit 1
+	fi
+
+	[[ "$accept" == "0" ]] || { echo -n "Marking pull request $pr as accepted..."; mark_pr_accepted "$COMMIT" "$URL"; echo "OK"; }
+
 	echo -n "Checking out pull request $pr..."
-	RESULT=
 	if r="$(hub pr checkout "$pr")"; then
 		echo "OK"
 	else
@@ -173,21 +185,14 @@ cmd_accept() {
 		exit 1
 	fi
 
-	PR_INFO="$(hub pr list -h "$(git rev-parse --abbrev-ref HEAD)" -f '%H %U' -s open -L 1)"
-	BRANCH="$(cut -d' ' -f1 <<< "$PR_INFO")"
-	COMMIT="$(git rev-parse "$BRANCH")"
-	URL="$(cut -d' ' -f2 <<< "$PR_INFO")"
 	echo -n "Fetching pull request $pr head branch $BRANCH..."
 	git fetch origin "$BRANCH" > /dev/null 2>&1
 	echo "OK"
 
 	echo -n "Creating review tag..."
-	REVIEWER_EMAIL="$(git config user.email)"
-	TAG_NAME="reviews/$REVIEWER_EMAIL-$(git rev-parse --short HEAD)"
 	git tag --sign -m "Changes on this branch were reviewed and accepted by the creator of this tag" "$TAG_NAME" "$COMMIT"
 	echo "OK"
 
-	[[ "$accept" == "0" ]] || { echo -n "Marking pull request $pr as accepted..."; mark_pr_accepted "$COMMIT" "$URL"; echo "OK"; }
 	[[ "$push" == "0" ]] || { echo -n "Pushing review tag to origin..."; git push origin "$TAG_NAME" > /dev/null 2>&1; echo "OK"; }
 }
 
@@ -333,7 +338,7 @@ cmd_merge() {
 		exit 1
 	fi
 
-	cmd_verify > /dev/null 2>&1
+	cmd_verify
 
 	# TODO: check ci status once github bot is functional
 	# this should cover the following checks:
