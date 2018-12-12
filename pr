@@ -162,6 +162,14 @@ cmd_accept() {
 		exit 1
 	fi
 
+	echo -n "Checking out pull request $pr..."
+	if r="$(hub pr checkout "$pr")"; then
+		echo "OK"
+	else
+		echo "Error: checkout failed"
+		echo "$r"
+		exit 1
+	fi
 	PR_INFO="$(hub pr list -h "$(git rev-parse --abbrev-ref HEAD)" -f '%H %U' -s open -L 1)"
 	BRANCH="$(cut -d' ' -f1 <<< "$PR_INFO")"
 	URL="$(cut -d' ' -f2 <<< "$PR_INFO")"
@@ -177,14 +185,6 @@ cmd_accept() {
 
 	[[ "$accept" == "0" ]] || { echo -n "Marking pull request $pr as accepted..."; mark_pr_accepted "$COMMIT" "$URL"; echo "OK"; }
 
-	echo -n "Checking out pull request $pr..."
-	if r="$(hub pr checkout "$pr")"; then
-		echo "OK"
-	else
-		echo "Error: checkout failed"
-		echo "$r"
-		exit 1
-	fi
 
 	echo -n "Fetching pull request $pr head branch $BRANCH..."
 	git fetch origin "$BRANCH" > /dev/null 2>&1
@@ -323,7 +323,7 @@ merge_pr() {
 	git pull origin "$UPSTREAM" # 1 tap
 	git merge --no-ff "$BRANCH_NAME"
 	git push origin "$UPSTREAM" ":$BRANCH_NAME" # 3 tap
-	git branch -D "$BRANCH_NAME"
+	git branch -d "$BRANCH_NAME"
 }
 
 cmd_merge() {
